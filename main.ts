@@ -7,6 +7,42 @@ interface MyPluginSettings {
 	username: string;
 }
 
+/**
+ * Represents one item in the Letterboxd RSS feed
+ * 
+ * @example
+ * ```
+ * {
+ *  "title": "Ahsoka, 2023 - ★★★★",
+ *  "link": "https://letterboxd.com/fleker/film/ahsoka/",
+ *  "guid": "letterboxd-review-568742403",
+ *  "pubDate": "Thu, 4 Apr 2024 17:28:09 +1300",
+ *  "letterboxd:watchedDate": "2024-04-04",
+ *  "letterboxd:rewatch": "No",
+ *  "letterboxd:filmTitle": "Ahsoka",
+ *  "letterboxd:filmYear": 2023,
+ *  "letterboxd:memberRating": 4,
+ *  "tmdb:tvId": 114461,
+ *  "description": "<p><img src=\"https://a.ltrbxd.com/resized/film-poster/1/0/5/5/4/3/0/1055430-ahsoka-0-600-0-900-crop.jpg?v=b8ec715c15\"/></p> <p>...</p> ",
+ *  "dc:creator": "fleker"
+ * },
+ * ```
+ */
+interface RSSEntry {
+	title: string
+	link: string
+	guid: string
+	pubDate: string
+	'letterboxd:watchedDate': string
+	'letterboxd:rewatch': string
+	'letterboxd:filmTitle': string
+	'letterboxd:filmYear': number
+	'letterboxd:memberRating': number
+	'tmdb:tvId': number
+	description: string
+	'dc:creator': string
+}
+
 const DEFAULT_SETTINGS: MyPluginSettings = {
 	username: 'default'
 }
@@ -30,7 +66,7 @@ export default class LetterboxdPlugin extends Plugin {
 						const parser = new XMLParser();
 						let jObj = parser.parse(res);
 						const filename = normalizePath('/Letterboxd Diary.md')
-						const diaryMdArr = jObj.rss.channel.item.map(item => {
+						const diaryMdArr = jObj.rss.channel.item.map((item: RSSEntry) => {
 							return `- Gave [${item['letterboxd:memberRating']} stars to ${item['letterboxd:filmTitle']}](${item['link']}) on [[${item['letterboxd:watchedDate']}]]`
 						})
 						const diaryFile = this.app.vault.getFileByPath(filename)
@@ -40,7 +76,7 @@ export default class LetterboxdPlugin extends Plugin {
 							this.app.vault.process(diaryFile, (data) => {
 								const diaryContentsArr = data.split('\n')
 								const diaryContentsSet = new Set(diaryContentsArr)
-								diaryMdArr.forEach(entry => diaryContentsSet.add(entry))
+								diaryMdArr.forEach((entry: string) => diaryContentsSet.add(entry))
 								return `${[...diaryContentsSet].join('\n')}`
 							})
 						}
