@@ -85,7 +85,7 @@ export default class LetterboxdPlugin extends Plugin {
 		})
 
 		// This adds a settings tab so the user can configure various aspects of the plugin
-		this.addSettingTab(new SampleSettingTab(this.app, this));
+		this.addSettingTab(new LetterboxdSettingTab(this.app, this));
 	}
 
 	async loadSettings() {
@@ -97,7 +97,7 @@ export default class LetterboxdPlugin extends Plugin {
 	}
 }
 
-class SampleSettingTab extends PluginSettingTab {
+class LetterboxdSettingTab extends PluginSettingTab {
 	plugin: LetterboxdPlugin;
 	settings: any
 
@@ -114,7 +114,7 @@ class SampleSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName('Letterboxd Username')
-			.setDesc('This is the username which we will use to fetch Letterboxd entries. It must be public.')
+			.setDesc('The username to fetch data from. This account must be public.')
 			.addText((component) => {
 				component.setPlaceholder('myusername')
 				component.setValue(this.plugin.settings.username)
