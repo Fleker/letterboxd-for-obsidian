@@ -1,9 +1,9 @@
-import { App, Plugin, PluginSettingTab, Setting } from 'obsidian';
+import { App, Plugin, PluginSettingTab, Setting, requestUrl } from 'obsidian';
 import { normalizePath } from 'obsidian';
 const { XMLParser } = require("fast-xml-parser");
 // Remember to rename these classes and interfaces!
 
-interface MyPluginSettings {
+interface LetterboxdSettings {
 	username: string;
 }
 
@@ -43,12 +43,12 @@ interface RSSEntry {
 	'dc:creator': string
 }
 
-const DEFAULT_SETTINGS: MyPluginSettings = {
+const DEFAULT_SETTINGS: LetterboxdSettings = {
 	username: 'default'
 }
 
 export default class LetterboxdPlugin extends Plugin {
-	settings: MyPluginSettings;
+	settings: LetterboxdSettings;
 
 	async onload() {
 		await this.loadSettings();
@@ -60,7 +60,7 @@ export default class LetterboxdPlugin extends Plugin {
 				if (!this.settings.username) {
 					throw new Error('Cannot get data for blank username')
 				}
-				fetch(`https://us-central1-redside-shiner.cloudfunctions.net/proxy?url=https://letterboxd.com/${this.settings.username}/rss/`)
+				requestUrl(`https://letterboxd.com/${this.settings.username}/rss/`)
 					.then(res => res.text())
 					.then(async res => {
 						const parser = new XMLParser();
