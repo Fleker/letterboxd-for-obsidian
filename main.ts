@@ -61,7 +61,7 @@ export default class LetterboxdPlugin extends Plugin {
 					throw new Error('Cannot get data for blank username')
 				}
 				requestUrl(`https://letterboxd.com/${this.settings.username}/rss/`)
-					.then(res => res.text())
+					.then(res => res.text)
 					.then(async res => {
 						const parser = new XMLParser();
 						let jObj = parser.parse(res);
