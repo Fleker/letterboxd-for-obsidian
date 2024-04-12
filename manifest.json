@@ -1,9 +1,9 @@
 {
 	"id": "letterboxd-rss-sync",
 	"name": "Letterboxd Diary RSS Sync",
-	"version": "1.0.6",
-	"minAppVersion": "0.15.0",
-	"description": "This is a way to sync your Letterboxd diary plugin to Obsidian",
+	"version": "1.0.7",
+	"minAppVersion": "1.4.16",
+	"description": "Syncs your public Letterboxd diary.",
 	"author": "Nick Felker",
 	"authorUrl": "https://felker.dev",
 	"isDesktopOnly": false

@@ -1,7 +1,6 @@
 import { App, Plugin, PluginSettingTab, Setting, requestUrl } from 'obsidian';
 import { normalizePath } from 'obsidian';
-const { XMLParser } = require("fast-xml-parser");
-// Remember to rename these classes and interfaces!
+import { XMLParser } from 'fast-xml-parser';
 
 interface LetterboxdSettings {
 	username: string;
@@ -44,7 +43,7 @@ interface RSSEntry {
 }
 
 const DEFAULT_SETTINGS: LetterboxdSettings = {
-	username: 'default'
+	username: ''
 }
 
 export default class LetterboxdPlugin extends Plugin {
@@ -54,8 +53,8 @@ export default class LetterboxdPlugin extends Plugin {
 		await this.loadSettings();
 
 		this.addCommand({
-			id: 'letterboxd-sync',
-			name: 'Sync Letterboxd Diary',
+			id: 'sync',
+			name: 'Pull newest entries',
 			callback: async () => {
 				if (!this.settings.username) {
 					throw new Error('Cannot get data for blank username')
@@ -84,7 +83,6 @@ export default class LetterboxdPlugin extends Plugin {
 			},
 		})
 
-		// This adds a settings tab so the user can configure various aspects of the plugin
 		this.addSettingTab(new LetterboxdSettingTab(this.app, this));
 	}
 
@@ -113,7 +111,7 @@ class LetterboxdSettingTab extends PluginSettingTab {
 		containerEl.empty();
 
 		new Setting(containerEl)
-			.setName('Letterboxd Username')
+			.setName('Letterboxd username')
 			.setDesc('The username to fetch data from. This account must be public.')
 			.addText((component) => {
 				component.setPlaceholder('myusername')
