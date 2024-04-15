@@ -65,7 +65,9 @@ export default class LetterboxdPlugin extends Plugin {
 						const parser = new XMLParser();
 						let jObj = parser.parse(res);
 						const filename = normalizePath('/Letterboxd Diary.md')
-						const diaryMdArr = jObj.rss.channel.item.map((item: RSSEntry) => {
+						const diaryMdArr = (jObj.rss.channel.item as RSSEntry[])
+								.sort((a, b) => a.pubDate.localeCompare(b.pubDate)) // Sort by date
+								.map((item: RSSEntry) => {
 							return `- Gave [${item['letterboxd:memberRating']} stars to ${item['letterboxd:filmTitle']}](${item['link']}) on [[${item['letterboxd:watchedDate']}]]`
 						})
 						const diaryFile = this.app.vault.getFileByPath(filename)
@@ -114,7 +116,7 @@ class LetterboxdSettingTab extends PluginSettingTab {
 			.setName('Letterboxd username')
 			.setDesc('The username to fetch data from. This account must be public.')
 			.addText((component) => {
-				component.setPlaceholder('myusername')
+				component.setPlaceholder('username')
 				component.setValue(this.plugin.settings.username)
 				component.onChange(async (value) => {
 					this.plugin.settings.username = value
