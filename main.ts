@@ -48,10 +48,8 @@ const DEFAULT_SETTINGS: LetterboxdSettings = {
 
 export default class LetterboxdPlugin extends Plugin {
 	settings: LetterboxdSettings;
-
 	async onload() {
 		await this.loadSettings();
-
 		this.addCommand({
 			id: 'sync',
 			name: 'Pull newest entries',
@@ -84,7 +82,52 @@ export default class LetterboxdPlugin extends Plugin {
 					})
 			},
 		})
-
+		this.addCommand({
+			id:"add-last-movie",
+			name: "Add Last watched movie",
+				callback: async () => {
+				if (!this.settings.username) {
+					throw new Error('Cannot get data for blank username')
+				}
+				requestUrl(`https://letterboxd.com/${this.settings.username}/rss/`)
+					.then(res => res.text)
+					.then(async res => {
+						const parser1 = new XMLParser();
+						let jObj1 = parser1.parse(res);
+						console.log(jObj1)
+						let item = jObj1.rss.channel.item[0] 
+						this.app.workspace.activeEditor?.editor?.replaceRange(
+							`>[!Last Movie Logged]+ \n> ${item['title']} on ${item['letterboxd:watchedDate']} \n> ${item['description']}  ` ,
+							this.app.workspace.activeEditor.editor.getCursor()
+						);
+					})
+			},
+		})
+		this.addCommand({
+			id:"add-last-2-movies",
+			name: "Add Last 2 watched movie",
+				callback: async () => {
+				if (!this.settings.username) {
+					throw new Error('Cannot get data for blank username')
+				}
+				requestUrl(`https://letterboxd.com/${this.settings.username}/rss/`)
+					.then(res => res.text)
+					.then(async res => {
+						const parser1 = new XMLParser();
+						let jObj1 = parser1.parse(res);
+						console.log(jObj1)
+						let items = [jObj1.rss.channel.item[0],jObj1.rss.channel.item[1]] 
+						var text = ">[!Last two Movies Logged]+ \n"
+						for (var item of items) {
+							text=text+`> ${item['title']} on ${item['letterboxd:watchedDate']} \n> ${item['description']}  `
+						}
+						this.app.workspace.activeEditor?.editor?.replaceRange(
+							text ,
+							this.app.workspace.activeEditor.editor.getCursor()
+						);
+					})
+			},
+		})
 		this.addSettingTab(new LetterboxdSettingTab(this.app, this));
 	}
 
