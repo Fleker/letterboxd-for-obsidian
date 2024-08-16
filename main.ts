@@ -62,12 +62,17 @@ export default class LetterboxdPlugin extends Plugin {
 					.then(async res => {
 						const parser = new XMLParser();
 						let jObj = parser.parse(res);
+						//console.log(jObj)
 						const filename = normalizePath('/Letterboxd Diary.md')
 						const diaryMdArr = (jObj.rss.channel.item as RSSEntry[])
-								.sort((a, b) => a.pubDate.localeCompare(b.pubDate)) // Sort by date
+								//.sort((a, b) => a.pubDate.localeCompare(b.pubDate)) // Sort by date
 								.map((item: RSSEntry) => {
 							return `- Gave [${item['letterboxd:memberRating']} stars to ${item['letterboxd:filmTitle']}](${item['link']}) on [[${item['letterboxd:watchedDate']}]]`
 						})
+						//const diaryMdArr = jObj.rss.channel.item.map( (item:RSSEntry)=>{
+						//	return `- Gave [${item['letterboxd:memberRating']} stars to ${item['letterboxd:filmTitle']}](${item['link']}) on [[${item['letterboxd:watchedDate']}]]`
+						//})
+						//console.log(diaryMdArr)
 						const diaryFile = this.app.vault.getFileByPath(filename)
 						if (diaryFile === null) {
 							this.app.vault.create(filename, `${diaryMdArr.join('\n')}`)
@@ -85,22 +90,48 @@ export default class LetterboxdPlugin extends Plugin {
 		this.addCommand({
 			id:"add-last-movie",
 			name: "Add Last watched movie",
-				callback: async () => {
-				if (!this.settings.username) {
-					throw new Error('Cannot get data for blank username')
-				}
-				requestUrl(`https://letterboxd.com/${this.settings.username}/rss/`)
-					.then(res => res.text)
-					.then(async res => {
-						const parser1 = new XMLParser();
-						let jObj1 = parser1.parse(res);
-						console.log(jObj1)
-						let item = jObj1.rss.channel.item[0] 
-						this.app.workspace.activeEditor?.editor?.replaceRange(
-							`>[!Last Movie Logged]+ \n> ${item['title']} on ${item['letterboxd:watchedDate']} \n> ${item['description']}  ` ,
-							this.app.workspace.activeEditor.editor.getCursor()
-						);
-					})
+			callback: async () => {
+			if (!this.settings.username) {
+				throw new Error('Cannot get data for blank username')
+			}
+			requestUrl(`https://letterboxd.com/${this.settings.username}/rss/`)
+				.then(res => res.text)
+				.then(async res => {
+					const parser1 = new XMLParser();
+					let jObj1 = parser1.parse(res);
+					let item = jObj1.rss.channel.item[0] 
+					this.app.workspace.activeEditor?.editor?.replaceRange(
+						`>[!Last Movie Logged]+ \n> [${item['title']}](${item['link']}) on ${item['letterboxd:watchedDate']} \n> ${item['description']}  ` ,
+						this.app.workspace.activeEditor.editor.getCursor()
+					);
+				})
+			},
+		})
+		this.addCommand({
+			id:"add-movies-watched-today",
+			name:"Add Movies watched today",
+			callback: async () => {
+			if (!this.settings.username) {
+				throw new Error('Cannot get data for blank username')
+			}
+			requestUrl(`https://letterboxd.com/${this.settings.username}/rss/`)
+				.then(res => res.text)
+				.then(async res => {
+					const parser1 = new XMLParser();
+					let jObj1 = parser1.parse(res);
+					let items = jObj1.rss.channel.item 
+					let d = new Date()
+					d.setHours(0,0,0,0)
+					let movies_today=items.filter(entry => Date.parse(entry.pubDate) > d);
+					var text = ">[!Movies added on letterboxd today]+ \n"
+					for (var item of movies_today) {
+						text=text+`> [${item['title']}](${item['link']}) on ${item['letterboxd:watchedDate']} \n> ${item['description']}  `
+					}					
+					this.app.workspace.activeEditor?.editor?.replaceRange(
+						text,
+						this.app.workspace.activeEditor.editor.getCursor()
+					);
+				})
 			},
 		})
 		this.addCommand({
@@ -115,11 +146,10 @@ export default class LetterboxdPlugin extends Plugin {
 					.then(async res => {
 						const parser1 = new XMLParser();
 						let jObj1 = parser1.parse(res);
-						console.log(jObj1)
 						let items = [jObj1.rss.channel.item[0],jObj1.rss.channel.item[1]] 
 						var text = ">[!Last two Movies Logged]+ \n"
 						for (var item of items) {
-							text=text+`> ${item['title']} on ${item['letterboxd:watchedDate']} \n> ${item['description']}  `
+							text=text+`> [${item['title']}](${item['link']}) on ${item['letterboxd:watchedDate']} \n> ${item['description']}  `
 						}
 						this.app.workspace.activeEditor?.editor?.replaceRange(
 							text ,
