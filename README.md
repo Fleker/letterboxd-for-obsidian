@@ -17,3 +17,23 @@ You open up the command palette and run the **Sync Letterboxd Diary** command. I
 ```
 
 This plugin could use your feedback and help to make it a success!
+
+## Usage:
+
+### Add Last Watched Movie
+
+This command will add the last watched movie in the present active editor. This will be done in a special block. For example:
+
+```md
+>[!Last Movie Logged]+ 
+> [The Tragedy of Macbeth, 2021 - ★★★★](https://letterboxd.com/ati_zaf/film/the-tragedy-of-macbeth/) on 2024-08-16 
+>  <p><img src="https://a.ltrbxd.com/resized/film-poster/5/1/9/0/5/2/519052-the-tragedy-of-macbeth-0-600-0-900-crop.jpg?v=2feba2c908"/></p> <p>Visually stunning. The use of light and shadow is remarkable in this movie. Denzel's monologue about the dagger was incredible.<br />Yet i felt something was amiss. Maybe it was acting by the rest of the cast. Can't put a pin on it.</p>   
+```
+
+### Add Last 2 Watched Movies
+
+This works exactly like the one movie.
+
+### Add Movies Watched Today
+
+This command is designed to keep the daily journal, diary keepers. You can use this command to add all the movies you posted on letterboxd today. The day is counted from midnight. You can add this in your daily note to keep a diary for yourself. This will work for most users except for power users that end up tagging 50 movies in a single day. 
