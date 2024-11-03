@@ -68,12 +68,10 @@ const objToFrontmatter = (obj: Record<string, any>): string => {
 	let yamlString = '---\n';
 	for (const key in obj) {
 		if (Array.isArray(obj[key])) {
-			yamlString += `${key}:\n`; // Add key with a colon for arrays
-			obj[key].forEach(value => {
-				yamlString += `  - ${value}\n`; // Indent array values
-			});
+			yamlString += `${key}:\n`;
+			obj[key].forEach(value => yamlString += `  - ${value}\n`);
 		} else {
-			yamlString += `${key}: ${obj[key]}\n`; // Key-value pair
+			yamlString += `${key}: ${obj[key]}\n`;
 		}
 	}
 	return yamlString += '---\n';
