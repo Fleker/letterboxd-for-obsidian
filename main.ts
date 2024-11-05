@@ -1,4 +1,4 @@
-import { App, Component, Plugin, PluginSettingTab, Setting, requestUrl } from 'obsidian';
+import { App, Plugin, PluginSettingTab, Setting, requestUrl, FuzzySuggestModal, TAbstractFile, TFile, TextComponent } from 'obsidian';
 import { normalizePath, moment } from 'obsidian';
 import { XMLParser } from 'fast-xml-parser';
 import {
@@ -9,8 +9,7 @@ import {
 interface LetterboxdSettings {
 	username: string;
 	dateFormat: string;
-	folder: string;
-	fileName: string;
+	path: string;
 	sort: string;
 }
 
@@ -50,11 +49,56 @@ interface RSSEntry {
 	'dc:creator': string
 }
 
+class FileSelect extends FuzzySuggestModal<TAbstractFile | string> {
+	files: TFile[];
+	plugin: LetterboxdPlugin;
+	values: string[];
+	textBox: TextComponent;
+	constructor(app: App, plugin: LetterboxdPlugin, textbox: TextComponent) {
+		super(app);
+		this.files = this.app.vault.getMarkdownFiles();
+		this.plugin = plugin;
+		this.textBox = textbox;
+		this.setPlaceholder('Select or create a file');
+		this.scope.register([], 'Tab', e => {
+			let child = this.resultContainerEl.querySelector('.suggestion-item.is-selected');
+			let text = child ? child.textContent ? child.textContent.split('/') : [] : [];
+			let currentInput = this.inputEl.value.split('/');
+			let toSlice = text[0] === currentInput[0] ? currentInput.length : 1;
+			if (currentInput.length && text[currentInput.length - 1] === currentInput[currentInput.length - 1]) toSlice++;
+			this.inputEl.value = text.slice(0, toSlice).join('/');
+		});
+
+		this.containerEl.addEventListener('keyup', e => {
+			if (e.key !== 'Enter') return;
+			if (!this.resultContainerEl.querySelector('.suggestion-item.is-selected')) {
+				this.plugin.settings.path = this.inputEl.value
+				this.plugin.saveSettings();
+				this.textBox.setValue(this.plugin.settings.path);
+				this.close();
+			}
+		})
+	}
+
+	getItems() {
+		return this.files.sort((a, b) => b.stat.mtime - a.stat.mtime);
+	}
+
+	getItemText(item: TFile): string {
+		return item.path;
+	}
+
+	onChooseItem(item: TFile, evt: MouseEvent | KeyboardEvent) {
+		this.plugin.settings.path = item.path;
+		this.plugin.saveSettings();
+		this.textBox.setValue(this.plugin.settings.path);
+	}
+}
+
 const DEFAULT_SETTINGS: LetterboxdSettings = {
 	username: '',
 	dateFormat: getDailyNoteSettings().format ?? '',
-	folder: '',
-	fileName: 'Letterboxd Diary',
+	path: 'Letterboxd Diary',
 	sort: 'Old'
 }
 
@@ -79,7 +123,6 @@ const objToFrontmatter = (obj: Record<string, any>): string => {
 
 export default class LetterboxdPlugin extends Plugin {
 	settings: LetterboxdSettings;
-
 	async onload() {
 		await this.loadSettings();
 
@@ -95,7 +138,7 @@ export default class LetterboxdPlugin extends Plugin {
 					.then(async res => {
 						const parser = new XMLParser();
 						let jObj = parser.parse(res);
-						const filename = normalizePath(`${this.settings.folder}/${this.settings.fileName}.md`);
+						const filename = normalizePath(`${this.settings.path}.md`);
 						const diaryMdArr = (jObj.rss.channel.item as RSSEntry[])
 							.sort((a, b) => {
 								const dateA = new Date(a.pubDate).getTime();
@@ -114,7 +157,9 @@ export default class LetterboxdPlugin extends Plugin {
 							})
 						const diaryFile = this.app.vault.getFileByPath(filename)
 						if (diaryFile === null) {
-							this.app.vault.createFolder(this.settings.folder);
+							let pathArray = this.settings.path.split('/');
+							pathArray.pop();
+							if (pathArray.length > 1) this.app.vault.createFolder(pathArray.join('/'));
 							this.app.vault.create(filename, `${diaryMdArr.join('\n')}`);
 						} else {
 							let frontMatter = '';
@@ -184,31 +229,29 @@ class LetterboxdSettingTab extends PluginSettingTab {
 				})
 			})
 
+		let fileSelectorText: TextComponent;
 		new Setting(containerEl)
-			.setName('Folder Path')
-			.setDesc('Leave blank to use the default folder.')
+			.setName('Set Note')
+			.setDesc('Select the file to save your Letterboxd to. If it does not exist, it will be created.')
 			.addText((component) => {
 				component.setPlaceholder('')
-				component.setValue(this.plugin.settings.folder)
+				component.setValue(this.plugin.settings.path)
 				component.onChange(async (value) => {
-					this.plugin.settings.folder = value
+					this.plugin.settings.path = value
 					await this.plugin.saveSettings()
-				})
+				});
+				fileSelectorText = component;
 			})
-		new Setting(containerEl)
-			.setName('File Name')
-			.setDesc('Name the file to save your diary to.')
-			.addText((component) => {
-				component.setPlaceholder('Letterboxd Diary')
-				component.setValue(this.plugin.settings.fileName)
-				component.onChange(async (value) => {
-					this.plugin.settings.fileName = value
-					await this.plugin.saveSettings()
+			.addButton((component) => {
+				component.setButtonText('Select Note')
+				component.onClick(async () => {
+					new FileSelect(this.app, this.plugin, fileSelectorText).open();
 				})
-			})
+			});
+
 		new Setting(containerEl)
 			.setName('Sort by Date')
-			.setDesc('How your diary will be sorted.')
+			.setDesc('Select the order to list your diary entries.')
 			.addDropdown((component) => {
 				component.addOption('Old', 'Oldest First');
 				component.addOption('Newest First', 'Newest First');
