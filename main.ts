@@ -138,7 +138,7 @@ export default class LetterboxdPlugin extends Plugin {
 					.then(async res => {
 						const parser = new XMLParser();
 						let jObj = parser.parse(res);
-						const filename = normalizePath(`${this.settings.path}.md`);
+						const filename = normalizePath(this.settings.path.endsWith('.md') ? this.settings.path : this.settings.path + '.md');
 						const diaryMdArr = (jObj.rss.channel.item as RSSEntry[])
 							.sort((a, b) => {
 								const dateA = new Date(a.pubDate).getTime();
