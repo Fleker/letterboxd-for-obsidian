@@ -71,7 +71,7 @@ class FileSelect extends FuzzySuggestModal<TAbstractFile | string> {
 
 		this.containerEl.addEventListener('keyup', e => {
 			if (e.key !== 'Enter') return;
-			if (!this.resultContainerEl.querySelector('.suggestion-item.is-selected')) {
+			if (!this.resultContainerEl.querySelector('.suggestion-item.is-selected') || e.getModifierState('Shift')) {
 				this.plugin.settings.path = this.inputEl.value
 				this.plugin.saveSettings();
 				this.textBox.setValue(this.plugin.settings.path);
