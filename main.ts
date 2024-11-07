@@ -254,7 +254,7 @@ class LetterboxdSettingTab extends PluginSettingTab {
 			.setDesc('Select the order to list your diary entries.')
 			.addDropdown((component) => {
 				component.addOption('Old', 'Oldest First');
-				component.addOption('Newest First', 'Newest First');
+				component.addOption('New', 'Newest First');
 				component.setValue(this.plugin.settings.sort)
 				component.onChange(async (value) => {
 					this.plugin.settings.sort = value
