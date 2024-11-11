@@ -250,6 +250,7 @@ class LetterboxdSettingTab extends PluginSettingTab {
 			})
 			.addButton((component) => {
 				component.setButtonText('Select Note');
+				component.setIcon('lucide-file-select');
 				component.onClick(async () => {
 					new FileSelect(this.app, this.plugin, fileSelectorText).open();
 				})
