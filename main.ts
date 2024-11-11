@@ -1,5 +1,4 @@
-import { App, Plugin, PluginSettingTab, Setting, requestUrl, FuzzySuggestModal, TAbstractFile, TFile, TextComponent } from 'obsidian';
-import { normalizePath, moment } from 'obsidian';
+import { App, Plugin, PluginSettingTab, Setting, requestUrl, FuzzySuggestModal, TAbstractFile, TFile, TextComponent, setIcon, normalizePath, moment } from 'obsidian';
 import { XMLParser } from 'fast-xml-parser';
 import {
 	getDailyNoteSettings
@@ -49,6 +48,7 @@ interface RSSEntry {
 	'dc:creator': string
 }
 
+// FileSelect is a subclass of FuzzySuggestModal that is used to select a file from the vault
 class FileSelect extends FuzzySuggestModal<TAbstractFile | string> {
 	files: TFile[];
 	plugin: LetterboxdPlugin;
@@ -58,8 +58,11 @@ class FileSelect extends FuzzySuggestModal<TAbstractFile | string> {
 		super(app);
 		this.files = this.app.vault.getMarkdownFiles();
 		this.plugin = plugin;
+		// The HTML element for the textbox needs to be passed in to the constructor to update
 		this.textBox = textbox;
 		this.setPlaceholder('Select or create a file');
+
+		// Logging TAB keypresses to add folder paths to the selection incrementally
 		this.scope.register([], 'Tab', e => {
 			let child = this.resultContainerEl.querySelector('.suggestion-item.is-selected');
 			let text = child ? child.textContent ? child.textContent.split('/') : [] : [];
@@ -69,6 +72,8 @@ class FileSelect extends FuzzySuggestModal<TAbstractFile | string> {
 			this.inputEl.value = text.slice(0, toSlice).join('/');
 		});
 
+		// Logging ENTER keypresses to submit the value if there are no selected items
+		// ENTER and TAB can only be handelled by different listeners, annoyingly
 		this.containerEl.addEventListener('keyup', e => {
 			if (e.key !== 'Enter') return;
 			if (!this.resultContainerEl.querySelector('.suggestion-item.is-selected') || e.getModifierState('Shift')) {
@@ -80,6 +85,7 @@ class FileSelect extends FuzzySuggestModal<TAbstractFile | string> {
 		})
 	}
 
+	// These functions are built into FuzzySuggestModal
 	getItems() {
 		return this.files.sort((a, b) => b.stat.mtime - a.stat.mtime);
 	}
@@ -243,7 +249,8 @@ class LetterboxdSettingTab extends PluginSettingTab {
 				fileSelectorText = component;
 			})
 			.addButton((component) => {
-				component.setButtonText('Select Note')
+				component.setButtonText('Select Note');
+				component.setIcon('lucide-file-select');
 				component.onClick(async () => {
 					new FileSelect(this.app, this.plugin, fileSelectorText).open();
 				})
