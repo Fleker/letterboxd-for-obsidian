@@ -1,9 +1,15 @@
-import { App, Plugin, PluginSettingTab, Setting, requestUrl } from 'obsidian';
-import { normalizePath } from 'obsidian';
+import { App, Plugin, PluginSettingTab, Setting, requestUrl, FuzzySuggestModal, TAbstractFile, TFile, TextComponent, setIcon, normalizePath, moment } from 'obsidian';
 import { XMLParser } from 'fast-xml-parser';
+import {
+	getDailyNoteSettings
+} from "obsidian-daily-notes-interface";
+
 
 interface LetterboxdSettings {
 	username: string;
+	dateFormat: string;
+	path: string;
+	sort: string;
 }
 
 /**
@@ -42,13 +48,87 @@ interface RSSEntry {
 	'dc:creator': string
 }
 
+// FileSelect is a subclass of FuzzySuggestModal that is used to select a file from the vault
+class FileSelect extends FuzzySuggestModal<TAbstractFile | string> {
+	files: TFile[];
+	plugin: LetterboxdPlugin;
+	values: string[];
+	textBox: TextComponent;
+	constructor(app: App, plugin: LetterboxdPlugin, textbox: TextComponent) {
+		super(app);
+		this.files = this.app.vault.getMarkdownFiles();
+		this.plugin = plugin;
+		// The HTML element for the textbox needs to be passed in to the constructor to update
+		this.textBox = textbox;
+		this.setPlaceholder('Select or create a file');
+
+		// Logging TAB keypresses to add folder paths to the selection incrementally
+		this.scope.register([], 'Tab', e => {
+			let child = this.resultContainerEl.querySelector('.suggestion-item.is-selected');
+			let text = child ? child.textContent ? child.textContent.split('/') : [] : [];
+			let currentInput = this.inputEl.value.split('/');
+			let toSlice = text[0] === currentInput[0] ? currentInput.length : 1;
+			if (currentInput.length && text[currentInput.length - 1] === currentInput[currentInput.length - 1]) toSlice++;
+			this.inputEl.value = text.slice(0, toSlice).join('/');
+		});
+
+		// Logging ENTER keypresses to submit the value if there are no selected items
+		// ENTER and TAB can only be handelled by different listeners, annoyingly
+		this.containerEl.addEventListener('keyup', e => {
+			if (e.key !== 'Enter') return;
+			if (!this.resultContainerEl.querySelector('.suggestion-item.is-selected') || e.getModifierState('Shift')) {
+				this.plugin.settings.path = this.inputEl.value
+				this.plugin.saveSettings();
+				this.textBox.setValue(this.plugin.settings.path);
+				this.close();
+			}
+		})
+	}
+
+	// These functions are built into FuzzySuggestModal
+	getItems() {
+		return this.files.sort((a, b) => b.stat.mtime - a.stat.mtime);
+	}
+
+	getItemText(item: TFile): string {
+		return item.path;
+	}
+
+	onChooseItem(item: TFile, evt: MouseEvent | KeyboardEvent) {
+		this.plugin.settings.path = item.path;
+		this.plugin.saveSettings();
+		this.textBox.setValue(this.plugin.settings.path);
+	}
+}
+
 const DEFAULT_SETTINGS: LetterboxdSettings = {
-	username: ''
+	username: '',
+	dateFormat: getDailyNoteSettings().format ?? '',
+	path: 'Letterboxd Diary',
+	sort: 'Old'
+}
+
+const decodeHtmlEntities = (text: string) => {
+	const txt = document.createElement("textarea");
+	txt.innerHTML = text;
+	return txt.value;
+};
+
+const objToFrontmatter = (obj: Record<string, any>): string => {
+	let yamlString = '---\n';
+	for (const key in obj) {
+		if (Array.isArray(obj[key])) {
+			yamlString += `${key}:\n`;
+			obj[key].forEach(value => yamlString += `  - ${value}\n`);
+		} else {
+			yamlString += `${key}: ${obj[key]}\n`;
+		}
+	}
+	return yamlString += '---\n';
 }
 
 export default class LetterboxdPlugin extends Plugin {
 	settings: LetterboxdSettings;
-
 	async onload() {
 		await this.loadSettings();
 
@@ -64,21 +144,52 @@ export default class LetterboxdPlugin extends Plugin {
 					.then(async res => {
 						const parser = new XMLParser();
 						let jObj = parser.parse(res);
-						const filename = normalizePath('/Letterboxd Diary.md')
+						const filename = normalizePath(this.settings.path.endsWith('.md') ? this.settings.path : this.settings.path + '.md');
 						const diaryMdArr = (jObj.rss.channel.item as RSSEntry[])
-								.sort((a, b) => a.pubDate.localeCompare(b.pubDate)) // Sort by date
-								.map((item: RSSEntry) => {
-							return `- Gave [${item['letterboxd:memberRating']} stars to ${item['letterboxd:filmTitle']}](${item['link']}) on [[${item['letterboxd:watchedDate']}]]`
-						})
+							.sort((a, b) => {
+								const dateA = new Date(a.pubDate).getTime();
+								const dateB = new Date(b.pubDate).getTime();
+								return this.settings.sort === 'Old' ? dateA - dateB : dateB - dateA;
+							})
+							.map((item: RSSEntry) => {
+								const filmTitle = decodeHtmlEntities(item['letterboxd:filmTitle']);
+								const watchedDate = this.settings.dateFormat
+									? moment(item['letterboxd:watchedDate']).format(this.settings.dateFormat)
+									: item['letterboxd:watchedDate'];
+
+								return item['letterboxd:memberRating'] !== undefined
+									? `- Gave [${item['letterboxd:memberRating']} stars to ${filmTitle}](${item['link']}) on [[${watchedDate}]]`
+									: `- Watched [${filmTitle}](${item['link']}) on [[${watchedDate}]]`;
+							})
 						const diaryFile = this.app.vault.getFileByPath(filename)
 						if (diaryFile === null) {
-							this.app.vault.create(filename, `${diaryMdArr.join('\n')}`)
+							let pathArray = this.settings.path.split('/');
+							pathArray.pop();
+							if (pathArray.length > 1) this.app.vault.createFolder(pathArray.join('/'));
+							this.app.vault.create(filename, `${diaryMdArr.join('\n')}`);
 						} else {
+							let frontMatter = '';
+							this.app.fileManager.processFrontMatter(diaryFile, (data) => {
+								if (Object.keys(data).length) frontMatter = objToFrontmatter(data);
+							});
 							this.app.vault.process(diaryFile, (data) => {
-								const diaryContentsArr = data.split('\n')
-								const diaryContentsSet = new Set(diaryContentsArr)
-								diaryMdArr.forEach((entry: string) => diaryContentsSet.add(entry))
-								return `${[...diaryContentsSet].join('\n')}`
+								let diaryContentsArr = data.split('\n');
+								if (frontMatter.length) {
+									let count = 0;
+									while (diaryContentsArr.length > 0) {
+										let firstElement = diaryContentsArr.shift();
+										if (firstElement === '---') {
+											count++;
+											if (count === 2) break;
+										}
+									}
+								}
+								const diaryContentsSet = new Set(diaryContentsArr);
+								const newEntries = diaryMdArr.filter((entry: string) => !diaryContentsSet.has(entry));
+								const finalEntries = this.settings.sort === 'Old'
+									? [...diaryContentsArr, ...newEntries]
+									: [...newEntries, ...diaryContentsArr];
+								return frontMatter.length ? frontMatter + finalEntries.join('\n') : finalEntries.join('\n');
 							})
 						}
 					})
@@ -107,7 +218,7 @@ class LetterboxdSettingTab extends PluginSettingTab {
 	}
 
 	display(): void {
-		const {containerEl} = this;
+		const { containerEl } = this;
 		this.settings = this.plugin.loadData()
 
 		containerEl.empty();
@@ -120,6 +231,40 @@ class LetterboxdSettingTab extends PluginSettingTab {
 				component.setValue(this.plugin.settings.username)
 				component.onChange(async (value) => {
 					this.plugin.settings.username = value
+					await this.plugin.saveSettings()
+				})
+			})
+
+		let fileSelectorText: TextComponent;
+		new Setting(containerEl)
+			.setName('Set Note')
+			.setDesc('Select the file to save your Letterboxd to. If it does not exist, it will be created.')
+			.addText((component) => {
+				component.setPlaceholder('')
+				component.setValue(this.plugin.settings.path)
+				component.onChange(async (value) => {
+					this.plugin.settings.path = value
+					await this.plugin.saveSettings()
+				});
+				fileSelectorText = component;
+			})
+			.addButton((component) => {
+				component.setButtonText('Select Note');
+				component.setIcon('lucide-file-select');
+				component.onClick(async () => {
+					new FileSelect(this.app, this.plugin, fileSelectorText).open();
+				})
+			});
+
+		new Setting(containerEl)
+			.setName('Sort by Date')
+			.setDesc('Select the order to list your diary entries.')
+			.addDropdown((component) => {
+				component.addOption('Old', 'Oldest First');
+				component.addOption('New', 'Newest First');
+				component.setValue(this.plugin.settings.sort)
+				component.onChange(async (value) => {
+					this.plugin.settings.sort = value
 					await this.plugin.saveSettings()
 				})
 			})
