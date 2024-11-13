@@ -10,6 +10,7 @@ interface LetterboxdSettings {
 	dateFormat: string;
 	path: string;
 	sort: string;
+	callout: boolean;
 }
 
 /**
@@ -105,7 +106,8 @@ const DEFAULT_SETTINGS: LetterboxdSettings = {
 	username: '',
 	dateFormat: getDailyNoteSettings().format ?? '',
 	path: 'Letterboxd Diary',
-	sort: 'Old'
+	sort: 'Old',
+	callout: false,
 }
 
 const decodeHtmlEntities = (text: string) => {
@@ -152,14 +154,26 @@ export default class LetterboxdPlugin extends Plugin {
 								return this.settings.sort === 'Old' ? dateA - dateB : dateB - dateA;
 							})
 							.map((item: RSSEntry) => {
+								let description = document.createElement('div');
+								description.innerHTML = item.description;
+								const imgElement = description.querySelector('img');
+								let img = imgElement ? imgElement.src : null;
+								let reviewText: string | null = Array.from(description.querySelectorAll('p'))
+									.map(p => p.textContent)
+									.join('\r > \r > ');
+								if (reviewText.contains('Watched on')) reviewText = null;
 								const filmTitle = decodeHtmlEntities(item['letterboxd:filmTitle']);
 								const watchedDate = this.settings.dateFormat
 									? moment(item['letterboxd:watchedDate']).format(this.settings.dateFormat)
 									: item['letterboxd:watchedDate'];
-
-								return item['letterboxd:memberRating'] !== undefined
-									? `- Gave [${item['letterboxd:memberRating']} stars to ${filmTitle}](${item['link']}) on [[${watchedDate}]]`
-									: `- Watched [${filmTitle}](${item['link']}) on [[${watchedDate}]]`;
+								let stars = item['letterboxd:memberRating'] !== undefined ? '★'.repeat(Math.floor(item['letterboxd:memberRating'])) + (item['letterboxd:memberRating'] % 1 ? '½' : '') : undefined;
+								if (this.settings.callout) {
+									return `> [!letterboxd]+ ${item['letterboxd:memberRating'] !== undefined || reviewText ? 'Review: ' : 'Watched: '} [${filmTitle}](${item['link']}) ${stars ? stars : ''} - [[${watchedDate}]] \r> ${reviewText ? img ? `![${filmTitle}|200](${img}) \r> ${reviewText}` : '' + reviewText : ''} \n`;
+								} else {
+									return item['letterboxd:memberRating'] !== undefined
+										? `- Gave [${stars} to ${filmTitle}](${item['link']}) on [[${watchedDate}]]`
+										: `- Watched [${filmTitle}](${item['link']}) on [[${watchedDate}]]`;
+								}
 							})
 						const diaryFile = this.app.vault.getFileByPath(filename)
 						if (diaryFile === null) {
@@ -264,6 +278,17 @@ class LetterboxdSettingTab extends PluginSettingTab {
 				component.setValue(this.plugin.settings.sort)
 				component.onChange(async (value) => {
 					this.plugin.settings.sort = value
+					await this.plugin.saveSettings()
+				})
+			})
+
+		new Setting(containerEl)
+			.setName('Callout Mode')
+			.setDesc('Selecting this will break each review into its own callout block with custom CSS.')
+			.addToggle((component) => {
+				component.setValue(this.plugin.settings.callout)
+				component.onChange(async (value) => {
+					this.plugin.settings.callout = value
 					await this.plugin.saveSettings()
 				})
 			})
