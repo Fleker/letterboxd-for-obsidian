@@ -10,7 +10,8 @@ interface LetterboxdSettings {
 	dateFormat: string;
 	path: string;
 	sort: string;
-	callout: boolean;
+	callout: number;
+	stars: number;
 }
 
 /**
@@ -107,7 +108,8 @@ const DEFAULT_SETTINGS: LetterboxdSettings = {
 	dateFormat: getDailyNoteSettings().format ?? '',
 	path: 'Letterboxd Diary',
 	sort: 'Old',
-	callout: false,
+	callout: 0,
+	stars: 0,
 }
 
 const decodeHtmlEntities = (text: string) => {
@@ -129,8 +131,22 @@ const objToFrontmatter = (obj: Record<string, any>): string => {
 	return yamlString += '---\n';
 }
 
+function starParser(rating: number, star: number) {
+	if (rating === undefined) return '';
+	switch (star) {
+		case 0:
+			return `(${rating} stars)`;
+		case 1:
+			return `(${'★'.repeat(Math.floor(rating)) + (rating % 1 ? '½' : '')})`;
+		case 2:
+			return `(${'⭐'.repeat(Math.floor(rating)) + (rating % 1 ? '½' : '')})`;
+	}
+}
+
+
 export default class LetterboxdPlugin extends Plugin {
 	settings: LetterboxdSettings;
+
 	async onload() {
 		await this.loadSettings();
 
@@ -160,19 +176,27 @@ export default class LetterboxdPlugin extends Plugin {
 								let img = imgElement ? imgElement.src : null;
 								let reviewText: string | null = Array.from(description.querySelectorAll('p'))
 									.map(p => p.textContent)
+									.filter(text => text && text.trim() !== "")
 									.join('\r > \r > ');
 								if (reviewText.contains('Watched on')) reviewText = null;
 								const filmTitle = decodeHtmlEntities(item['letterboxd:filmTitle']);
 								const watchedDate = this.settings.dateFormat
 									? moment(item['letterboxd:watchedDate']).format(this.settings.dateFormat)
 									: item['letterboxd:watchedDate'];
-								let stars = item['letterboxd:memberRating'] !== undefined ? '★'.repeat(Math.floor(item['letterboxd:memberRating'])) + (item['letterboxd:memberRating'] % 1 ? '½' : '') : undefined;
-								if (this.settings.callout) {
-									return `> [!letterboxd]+ ${item['letterboxd:memberRating'] !== undefined || reviewText ? 'Review: ' : 'Watched: '} [${filmTitle}](${item['link']}) ${stars ? stars : ''} - [[${watchedDate}]] \r> ${reviewText ? img ? `![${filmTitle}|200](${img}) \r> ${reviewText}` : '' + reviewText : ''} \n`;
-								} else {
-									return item['letterboxd:memberRating'] !== undefined
-										? `- Gave [${stars} to ${filmTitle}](${item['link']}) on [[${watchedDate}]]`
-										: `- Watched [${filmTitle}](${item['link']}) on [[${watchedDate}]]`;
+								let stars = starParser(item['letterboxd:memberRating'], this.settings.stars);
+								switch (this.settings.callout) {
+									case 0:
+										// Just List
+										return `- ${stars?.length ? `Reviewed [${filmTitle}](${item['link']}) ` + stars : `Watched [${filmTitle}](${item['link']})`} on [[${watchedDate}]]`;
+									case 1:
+										// List with Review
+										return `- ${reviewText ? `Reviewed ` : `Watched `} [${filmTitle}](${item['link']}) ${stars} on [[${watchedDate}]] ${reviewText ? `\n\n >${reviewText}\n` : ''}`;
+									case 2:
+										// Callout
+										return `> [!letterboxd]+ ${item['letterboxd:memberRating'] !== undefined || reviewText ? 'Review: ' : 'Watched: '} [${filmTitle}](${item['link']}) ${stars} - [[${watchedDate}]] \r> ${reviewText ? reviewText : ''}\n`;
+									case 3:
+										//Callout with Image
+										return `> [!letterboxd]+ ${item['letterboxd:memberRating'] !== undefined || reviewText ? 'Review: ' : 'Watched: '} [${filmTitle}](${item['link']}) ${stars} - [[${watchedDate}]] \r> ${reviewText ? img ? `![${filmTitle}|200](${img}) \r> ${reviewText}` : reviewText : ''}\n`;
 								}
 							})
 						const diaryFile = this.app.vault.getFileByPath(filename)
@@ -285,10 +309,27 @@ class LetterboxdSettingTab extends PluginSettingTab {
 		new Setting(containerEl)
 			.setName('Callout Mode')
 			.setDesc('Selecting this will break each review into its own callout block with custom CSS.')
-			.addToggle((component) => {
-				component.setValue(this.plugin.settings.callout)
+			.addDropdown((component) => {
+				component.addOption('0', 'List Only');
+				component.addOption('1', 'List & Reviews');
+				component.addOption('2', 'Callout');
+				component.addOption('3', 'Callout w/ Poster')
+				component.setValue(this.plugin.settings.callout.toString());
 				component.onChange(async (value) => {
-					this.plugin.settings.callout = value
+					this.plugin.settings.callout = parseInt(value)
+					await this.plugin.saveSettings()
+				})
+			})
+		new Setting(containerEl)
+			.setName('Stars')
+			.setDesc('How would you like to display star ratings?')
+			.addDropdown((component) => {
+				component.addOption('0', '5 Stars');
+				component.addOption('1', '★★★★★');
+				component.addOption('2', '⭐⭐⭐⭐⭐')
+				component.setValue(this.plugin.settings.stars.toString());
+				component.onChange(async (value) => {
+					this.plugin.settings.stars = parseInt(value)
 					await this.plugin.saveSettings()
 				})
 			})
