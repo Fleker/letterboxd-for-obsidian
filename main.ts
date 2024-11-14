@@ -307,8 +307,8 @@ class LetterboxdSettingTab extends PluginSettingTab {
 			})
 
 		new Setting(containerEl)
-			.setName('Callout Mode')
-			.setDesc('Selecting this will break each review into its own callout block with custom CSS.')
+			.setName('Display Style')
+			.setDesc('Select how to list your reviews. Options cover plain text lists, callouts, or callouts with poster images.')
 			.addDropdown((component) => {
 				component.addOption('0', 'List Only');
 				component.addOption('1', 'List & Reviews');
@@ -322,7 +322,7 @@ class LetterboxdSettingTab extends PluginSettingTab {
 			})
 		new Setting(containerEl)
 			.setName('Stars')
-			.setDesc('How would you like to display star ratings?')
+			.setDesc('Select how you would like stars to be represented.')
 			.addDropdown((component) => {
 				component.addOption('0', '5 Stars');
 				component.addOption('1', '★★★★★');
