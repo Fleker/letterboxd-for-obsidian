@@ -1,4 +1,4 @@
-import { App, Plugin, PluginSettingTab, Setting, requestUrl, FuzzySuggestModal, TAbstractFile, TFile, TextComponent, setIcon, normalizePath, moment } from 'obsidian';
+import { App, Plugin, PluginSettingTab, Setting, requestUrl, FuzzySuggestModal, TAbstractFile, TFile, TextComponent, normalizePath, moment } from 'obsidian';
 import { XMLParser } from 'fast-xml-parser';
 import {
 	getDailyNoteSettings
@@ -10,7 +10,7 @@ interface LetterboxdSettings {
 	dateFormat: string;
 	path: string;
 	sort: string;
-	callout: number;
+	callout: 'List' | 'ListReview' | 'Callout' | 'CalloutPoster';
 	stars: number;
 }
 
@@ -35,6 +35,7 @@ interface LetterboxdSettings {
  * },
  * ```
  */
+
 interface RSSEntry {
 	title: string
 	link: string
@@ -108,7 +109,7 @@ const DEFAULT_SETTINGS: LetterboxdSettings = {
 	dateFormat: getDailyNoteSettings().format ?? '',
 	path: 'Letterboxd Diary',
 	sort: 'Old',
-	callout: 0,
+	callout: 'List',
 	stars: 0,
 }
 
@@ -131,15 +132,43 @@ const objToFrontmatter = (obj: Record<string, any>): string => {
 	return yamlString += '---\n';
 }
 
-function starParser(rating: number, star: number) {
+function starParser(rating: number | undefined, star: number): string {
 	if (rating === undefined) return '';
 	switch (star) {
 		case 0:
+		default:
 			return `(${rating} stars)`;
 		case 1:
 			return `(${'★'.repeat(Math.floor(rating)) + (rating % 1 ? '½' : '')})`;
 		case 2:
 			return `(${'⭐'.repeat(Math.floor(rating)) + (rating % 1 ? '½' : '')})`;
+	}
+}
+
+function printOut(callout: LetterboxdSettings['callout'], item: RSSEntry) {
+	let description = document.createElement('div');
+	description.innerHTML = item.description;
+	const imgElement = description.querySelector('img');
+	let img = imgElement ? imgElement.src : null;
+	let reviewText: string | null = Array.from(description.querySelectorAll('p'))
+		.map(p => p.textContent)
+		.filter(text => text && text.trim() !== "")
+		.join('\r > \r > ');
+	if (reviewText.contains('Watched on')) reviewText = null;
+	const filmTitle = decodeHtmlEntities(item['letterboxd:filmTitle']);
+	const watchedDate = this.settings.dateFormat
+		? moment(item['letterboxd:watchedDate']).format(this.settings.dateFormat)
+		: item['letterboxd:watchedDate'];
+	let stars = starParser(item['letterboxd:memberRating'], this.settings.stars);
+	switch (callout) {
+		case 'List':
+			return `- ${stars?.length ? `Reviewed [${filmTitle}](${item['link']}) ` + stars : `Watched [${filmTitle}](${item['link']})`} on [[${watchedDate}]]`;
+		case 'ListReview':
+			return `- ${reviewText ? `Reviewed ` : `Watched `} [${filmTitle}](${item['link']}) ${stars} on [[${watchedDate}]] ${reviewText ? `\n\n >${reviewText}\n` : ''}`;
+		case 'Callout':
+			return `> [!letterboxd]+ ${item['letterboxd:memberRating'] !== undefined || reviewText ? 'Review: ' : 'Watched: '} [${filmTitle}](${item['link']}) ${stars} - [[${watchedDate}]] \r> ${reviewText ? reviewText : ''}\n`;
+		case 'CalloutPoster':
+			return `> [!letterboxd]+ ${item['letterboxd:memberRating'] !== undefined || reviewText ? 'Review: ' : 'Watched: '} [${filmTitle}](${item['link']}) ${stars} - [[${watchedDate}]] \r> ${reviewText ? img ? `![${filmTitle}|200](${img}) \r> ${reviewText}` : reviewText : ''}\n`;
 	}
 }
 
@@ -170,34 +199,7 @@ export default class LetterboxdPlugin extends Plugin {
 								return this.settings.sort === 'Old' ? dateA - dateB : dateB - dateA;
 							})
 							.map((item: RSSEntry) => {
-								let description = document.createElement('div');
-								description.innerHTML = item.description;
-								const imgElement = description.querySelector('img');
-								let img = imgElement ? imgElement.src : null;
-								let reviewText: string | null = Array.from(description.querySelectorAll('p'))
-									.map(p => p.textContent)
-									.filter(text => text && text.trim() !== "")
-									.join('\r > \r > ');
-								if (reviewText.contains('Watched on')) reviewText = null;
-								const filmTitle = decodeHtmlEntities(item['letterboxd:filmTitle']);
-								const watchedDate = this.settings.dateFormat
-									? moment(item['letterboxd:watchedDate']).format(this.settings.dateFormat)
-									: item['letterboxd:watchedDate'];
-								let stars = starParser(item['letterboxd:memberRating'], this.settings.stars);
-								switch (this.settings.callout) {
-									case 0:
-										// Just List
-										return `- ${stars?.length ? `Reviewed [${filmTitle}](${item['link']}) ` + stars : `Watched [${filmTitle}](${item['link']})`} on [[${watchedDate}]]`;
-									case 1:
-										// List with Review
-										return `- ${reviewText ? `Reviewed ` : `Watched `} [${filmTitle}](${item['link']}) ${stars} on [[${watchedDate}]] ${reviewText ? `\n\n >${reviewText}\n` : ''}`;
-									case 2:
-										// Callout
-										return `> [!letterboxd]+ ${item['letterboxd:memberRating'] !== undefined || reviewText ? 'Review: ' : 'Watched: '} [${filmTitle}](${item['link']}) ${stars} - [[${watchedDate}]] \r> ${reviewText ? reviewText : ''}\n`;
-									case 3:
-										//Callout with Image
-										return `> [!letterboxd]+ ${item['letterboxd:memberRating'] !== undefined || reviewText ? 'Review: ' : 'Watched: '} [${filmTitle}](${item['link']}) ${stars} - [[${watchedDate}]] \r> ${reviewText ? img ? `![${filmTitle}|200](${img}) \r> ${reviewText}` : reviewText : ''}\n`;
-								}
+								return printOut(this.settings.callout, item);
 							})
 						const diaryFile = this.app.vault.getFileByPath(filename)
 						if (diaryFile === null) {
@@ -282,7 +284,7 @@ class LetterboxdSettingTab extends PluginSettingTab {
 				component.setValue(this.plugin.settings.path)
 				component.onChange(async (value) => {
 					this.plugin.settings.path = value
-					await this.plugin.saveSettings()
+					await this.plugin.saveSettings();
 				});
 				fileSelectorText = component;
 			})
@@ -310,13 +312,13 @@ class LetterboxdSettingTab extends PluginSettingTab {
 			.setName('Display Style')
 			.setDesc('Select how to list your reviews. Options cover plain text lists, callouts, or callouts with poster images.')
 			.addDropdown((component) => {
-				component.addOption('0', 'List Only');
-				component.addOption('1', 'List & Reviews');
-				component.addOption('2', 'Callout');
-				component.addOption('3', 'Callout w/ Poster')
+				component.addOption('List', 'List Only');
+				component.addOption('ListReivew', 'List & Reviews');
+				component.addOption('Callout', 'Callout');
+				component.addOption('CalloutPoster', 'Callout w/ Poster')
 				component.setValue(this.plugin.settings.callout.toString());
-				component.onChange(async (value) => {
-					this.plugin.settings.callout = parseInt(value)
+				component.onChange(async (value: LetterboxdSettings['callout']) => {
+					this.plugin.settings.callout = value;
 					await this.plugin.saveSettings()
 				})
 			})
