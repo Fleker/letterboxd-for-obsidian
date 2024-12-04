@@ -110,7 +110,7 @@ const DEFAULT_SETTINGS: LetterboxdSettings = {
 	path: 'Letterboxd Diary',
 	sort: 'Old',
 	callout: 'List',
-	stars: 0,
+	stars: 0
 }
 
 const decodeHtmlEntities = (text: string) => {
@@ -145,7 +145,7 @@ function starParser(rating: number | undefined, star: number): string {
 	}
 }
 
-function printOut(callout: LetterboxdSettings['callout'], item: RSSEntry) {
+function printOut(settings: LetterboxdSettings, item: RSSEntry) {
 	let description = document.createElement('div');
 	description.innerHTML = item.description;
 	const imgElement = description.querySelector('img');
@@ -156,15 +156,15 @@ function printOut(callout: LetterboxdSettings['callout'], item: RSSEntry) {
 		.join('\r > \r > ');
 	if (reviewText.contains('Watched on')) reviewText = null;
 	const filmTitle = decodeHtmlEntities(item['letterboxd:filmTitle']);
-	const watchedDate = this.settings.dateFormat
-		? moment(item['letterboxd:watchedDate']).format(this.settings.dateFormat)
+	const watchedDate = settings.dateFormat
+		? moment(item['letterboxd:watchedDate']).format(settings.dateFormat)
 		: item['letterboxd:watchedDate'];
-	let stars = starParser(item['letterboxd:memberRating'], this.settings.stars);
-	switch (callout) {
+	let stars = starParser(item['letterboxd:memberRating'], settings.stars);
+	switch (settings.callout) {
 		case 'List':
 			return `- ${stars?.length ? `Reviewed [${filmTitle}](${item['link']}) ` + stars : `Watched [${filmTitle}](${item['link']})`} on [[${watchedDate}]]`;
 		case 'ListReview':
-			return `- ${reviewText ? `Reviewed ` : `Watched `} [${filmTitle}](${item['link']}) ${stars} on [[${watchedDate}]] ${reviewText ? `\n\n >${reviewText}\n` : ''}`;
+			return `- ${reviewText ? `Reviewed ` : `Watched `} [${filmTitle}](${item['link']}) ${stars} on [[${watchedDate}]] ${reviewText ? `\r >${reviewText}\n` : ''}`;
 		case 'Callout':
 			return `> [!letterboxd]+ ${item['letterboxd:memberRating'] !== undefined || reviewText ? 'Review: ' : 'Watched: '} [${filmTitle}](${item['link']}) ${stars} - [[${watchedDate}]] \r> ${reviewText ? reviewText : ''}\n`;
 		case 'CalloutPoster':
@@ -199,7 +199,7 @@ export default class LetterboxdPlugin extends Plugin {
 								return this.settings.sort === 'Old' ? dateA - dateB : dateB - dateA;
 							})
 							.map((item: RSSEntry) => {
-								return printOut(this.settings.callout, item);
+								return printOut(this.settings, item);
 							})
 						const diaryFile = this.app.vault.getFileByPath(filename)
 						if (diaryFile === null) {
@@ -214,6 +214,7 @@ export default class LetterboxdPlugin extends Plugin {
 							});
 							this.app.vault.process(diaryFile, (data) => {
 								let diaryContentsArr = data.split('\n');
+								// If there is frontmatter, this works out how many lines to ignore.
 								if (frontMatter.length) {
 									let count = 0;
 									while (diaryContentsArr.length > 0) {
@@ -313,7 +314,7 @@ class LetterboxdSettingTab extends PluginSettingTab {
 			.setDesc('Select how to list your reviews. Options cover plain text lists, callouts, or callouts with poster images.')
 			.addDropdown((component) => {
 				component.addOption('List', 'List Only');
-				component.addOption('ListReivew', 'List & Reviews');
+				component.addOption('ListReview', 'List & Reviews');
 				component.addOption('Callout', 'Callout');
 				component.addOption('CalloutPoster', 'Callout w/ Poster')
 				component.setValue(this.plugin.settings.callout.toString());
