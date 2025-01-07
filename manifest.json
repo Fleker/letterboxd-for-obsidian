@@ -1,7 +1,7 @@
 {
 	"id": "letterboxd-rss-sync",
 	"name": "Letterboxd Diary RSS Sync",
-	"version": "1.1.1",
+	"version": "1.1.2",
 	"minAppVersion": "1.4.16",
 	"description": "Syncs your public Letterboxd diary.",
 	"author": "Nick Felker",
