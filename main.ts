@@ -12,6 +12,7 @@ interface LetterboxdSettings {
 	sort: string;
 	callout: 'List' | 'ListReview' | 'Callout' | 'CalloutPoster';
 	stars: number;
+	addReferenceId: boolean;
 }
 
 /**
@@ -110,7 +111,8 @@ const DEFAULT_SETTINGS: LetterboxdSettings = {
 	path: 'Letterboxd Diary',
 	sort: 'Old',
 	callout: 'List',
-	stars: 0
+	stars: 0,
+	addReferenceId: false,
 }
 
 const decodeHtmlEntities = (text: string) => {
@@ -160,15 +162,21 @@ function printOut(settings: LetterboxdSettings, item: RSSEntry) {
 		? moment(item['letterboxd:watchedDate']).format(settings.dateFormat)
 		: item['letterboxd:watchedDate'];
 	let stars = starParser(item['letterboxd:memberRating'], settings.stars);
+	const reference = (() => {
+		if (settings.addReferenceId) {
+			return ` ^letterboxd${item.guid.split('-')[2]}`
+		}
+		return ''
+	})()
 	switch (settings.callout) {
 		case 'List':
 			return `- ${stars?.length ? `Reviewed [${filmTitle}](${item['link']}) ` + stars : `Watched [${filmTitle}](${item['link']})`} on [[${watchedDate}]]`;
 		case 'ListReview':
 			return `- ${reviewText ? `Reviewed ` : `Watched `} [${filmTitle}](${item['link']}) ${stars} on [[${watchedDate}]] ${reviewText ? `\r >${reviewText}\n` : ''}`;
 		case 'Callout':
-			return `> [!letterboxd]+ ${item['letterboxd:memberRating'] !== undefined || reviewText ? 'Review: ' : 'Watched: '} [${filmTitle}](${item['link']}) ${stars} - [[${watchedDate}]] \r> ${reviewText ? reviewText : ''}\n`;
+			return `> [!letterboxd]+ ${item['letterboxd:memberRating'] !== undefined || reviewText ? 'Review: ' : 'Watched: '} [${filmTitle}](${item['link']}) ${stars} - [[${watchedDate}]] \r> ${reviewText ? reviewText : ''}${reference}\n`;
 		case 'CalloutPoster':
-			return `> [!letterboxd]+ ${item['letterboxd:memberRating'] !== undefined || reviewText ? 'Review: ' : 'Watched: '} [${filmTitle}](${item['link']}) ${stars} - [[${watchedDate}]] \r> ${reviewText ? img ? `![${filmTitle}|200](${img}) \r> ${reviewText}` : reviewText : ''}\n`;
+			return `> [!letterboxd]+ ${item['letterboxd:memberRating'] !== undefined || reviewText ? 'Review: ' : 'Watched: '} [${filmTitle}](${item['link']}) ${stars} - [[${watchedDate}]] \r> ${reviewText ? img ? `![${filmTitle}|200](${img}) \r> ${reviewText}` : reviewText : ''}${reference}\n`;
 	}
 }
 
@@ -333,6 +341,16 @@ class LetterboxdSettingTab extends PluginSettingTab {
 				component.setValue(this.plugin.settings.stars.toString());
 				component.onChange(async (value) => {
 					this.plugin.settings.stars = parseInt(value)
+					await this.plugin.saveSettings()
+				})
+			})
+		new Setting(containerEl)
+			.setName('Add Reference ID')
+			.setDesc('Only applies to callouts.')
+			.addToggle((component) => {
+				component.setValue(this.plugin.settings.addReferenceId)
+				component.onChange(async (value) => {
+					this.plugin.settings.addReferenceId = value
 					await this.plugin.saveSettings()
 				})
 			})
