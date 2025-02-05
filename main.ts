@@ -354,5 +354,18 @@ class LetterboxdSettingTab extends PluginSettingTab {
 					await this.plugin.saveSettings()
 				})
 			})
+
+		new Setting(containerEl)
+			.setName('Date Format')
+			.setDesc('Enter the Moment.js date format to display watched dates (e.g., YYYY-MM-DD)')
+			.addText((component) => {
+				component.setPlaceholder('YYYY-MM-DD');
+				component.setValue(this.plugin.settings.dateFormat);
+				component.onChange(async (value) => {
+					this.plugin.settings.dateFormat = value;
+					await this.plugin.saveSettings();
+				});
+			});
+		
 	}
 }
