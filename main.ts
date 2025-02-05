@@ -354,18 +354,35 @@ class LetterboxdSettingTab extends PluginSettingTab {
 					await this.plugin.saveSettings()
 				})
 			})
-
-		new Setting(containerEl)
-			.setName('Date Format')
-			.setDesc('Enter the Moment.js date format to display watched dates (e.g., YYYY-MM-DD)')
-			.addText((component) => {
-				component.setPlaceholder('YYYY-MM-DD');
-				component.setValue(this.plugin.settings.dateFormat);
-				component.onChange(async (value) => {
-					this.plugin.settings.dateFormat = value;
-					await this.plugin.saveSettings();
-				});
-			});
 		
+			let datePreviewSpan: HTMLElement;
+
+const dateFormatSetting = new Setting(containerEl)
+	.setName('Date Format')
+	.setDesc('Enter the Moment.js date format to display watched dates (e.g., YYYY-MM-DD)');
+
+dateFormatSetting.addText((text) => {
+	text.setPlaceholder('YYYY-MM-DD');
+	text.setValue(this.plugin.settings.dateFormat);
+	text.onChange(async (value) => {
+		this.plugin.settings.dateFormat = value;
+		await this.plugin.saveSettings();
+		try {
+			datePreviewSpan.textContent = moment().format(value);
+		} catch (error) {
+			datePreviewSpan.textContent = 'Invalid format';
+		}
+	});
+});
+
+// Append the preview element to the info element (left column) so it appears below the description.
+datePreviewSpan = dateFormatSetting.infoEl.createEl('div', { cls: 'date-format-preview' });
+datePreviewSpan.style.fontSize = '0.8em';    // Smaller font size
+datePreviewSpan.style.marginTop = '4px';       // Small margin for spacing
+datePreviewSpan.style.whiteSpace = 'nowrap';   // Keep it on one single line
+datePreviewSpan.style.color = 'var(--text-accent)';  // Obsidian’s accent (purple) color
+datePreviewSpan.textContent = `This is how it will look: ${moment().format(this.plugin.settings.dateFormat)}`;
+
+			
 	}
 }

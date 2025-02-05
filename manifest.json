@@ -1,6 +1,6 @@
 {
-	"id": "letterboxd-rss-sync",
-	"name": "Letterboxd Diary RSS Sync",
+	"id": "letterboxd-rss-sync-fork",
+	"name": "Letterboxd Diary RSS Sync Fork",
 	"version": "1.2.0",
 	"minAppVersion": "1.4.16",
 	"description": "Syncs your public Letterboxd diary.",
