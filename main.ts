@@ -1,4 +1,4 @@
-import { App, Plugin, PluginSettingTab, Setting, requestUrl, FuzzySuggestModal, TAbstractFile, TFile, TextComponent, normalizePath, moment } from 'obsidian';
+import { App, Plugin, PluginSettingTab, Setting, requestUrl, FuzzySuggestModal, TAbstractFile, TFile, TextComponent, normalizePath, moment, Notice } from 'obsidian';
 import { XMLParser } from 'fast-xml-parser';
 import {
 	getDailyNoteSettings
@@ -214,6 +214,9 @@ export default class LetterboxdPlugin extends Plugin {
 								const dateB = new Date(b.pubDate).getTime();
 								return this.settings.sort === 'Old' ? dateA - dateB : dateB - dateA;
 							})
+							.filter((item: RSSEntry) => {
+								return item.title !== undefined
+							})
 							.map((item: RSSEntry) => {
 								return printOut(this.settings, item);
 							})
@@ -249,6 +252,7 @@ export default class LetterboxdPlugin extends Plugin {
 								return frontMatter.length ? frontMatter + finalEntries.join('\n') : finalEntries.join('\n');
 							})
 						}
+						return new Notice("Letterboxd entries synced!")
 					})
 			},
 		})
